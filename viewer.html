@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markdown Viewer</title>
+    <link rel="stylesheet" href="styles/viewer.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Markdown Viewer</h1>
+      <div class="actions">
+        <button id="open-file-btn" type="button">Open File</button>
+        <button id="refresh-btn" type="button">Reparse</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel toc-panel">
+        <h2>Recent</h2>
+        <ul id="recent-list">
+          <li>No recent documents</li>
+        </ul>
+
+        <h2>TOC</h2>
+        <ul id="toc-list">
+          <li>No document loaded</li>
+        </ul>
+      </aside>
+
+      <section class="panel content-panel">
+        <div id="status-line">Ready. Select a markdown file.</div>
+        <article id="content-root"></article>
+      </section>
+    </main>
+
+    <script src="lib/vendor/markdown-it.min.js"></script>
+    <script src="lib/vendor/purify.min.js"></script>
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Markdown Viewer v1",
+  "description": "Open local markdown files with stable rendering and presets.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Open Markdown Viewer"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_page": "options.html",
+  "permissions": [
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "file:///*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "file:///*"
+      ],
+      "js": [
+        "content/file_redirect.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viewer.html",
+        "styles/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

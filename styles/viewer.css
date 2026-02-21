@@ -1,0 +1,156 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f7fb;
+  color: #111827;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 61px);
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.toc-panel ul {
+  margin: 0 0 14px;
+  padding-left: 16px;
+}
+
+.toc-panel button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 8px;
+  margin: 4px 0;
+  cursor: pointer;
+}
+
+#status-line {
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+#content-root {
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+#content-root pre,
+#content-root code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+#content-root pre {
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+#content-root table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+#content-root th,
+#content-root td {
+  border: 1px solid #dbe3ef;
+  padding: 8px 10px;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+#content-root blockquote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 4px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.md-section {
+  margin-bottom: 18px;
+}
+
+.virtual-window {
+  min-height: 12px;
+}
+
+.virtual-spacer {
+  position: relative;
+  transition: height 120ms ease-out;
+}
+
+.virtual-spacer.active {
+  display: flex;
+  color: #64748b;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.virtual-spacer-top.active {
+  align-items: flex-end;
+  padding-bottom: 8px;
+}
+
+.virtual-spacer-bottom.active {
+  align-items: flex-start;
+  padding-top: 8px;
+}
+
+@media (max-width: 880px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
