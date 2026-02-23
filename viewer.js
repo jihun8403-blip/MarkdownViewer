@@ -1,3 +1,5 @@
+import { getDocumentCache, saveDocumentCache, setCacheMeta, touchDocument } from "./storage/db.js";
+
 const RECENT_DOCS_KEY = "recent_docs_v1";
 const MAX_RECENTS = 20;
 const HANDLE_DB_NAME = "md_viewer_handles_v1";
@@ -172,12 +174,15 @@ function updateStatus(message) {
   statusLine.textContent = message;
 }
 
-function resetRenderState(docId, file, sourceUrl = "") {
+function resetRenderState(docId, file, sourceUrl = "", sourceType = "fileHandle") {
   currentDocState = {
     docId,
     fileName: file.name,
     fileSize: file.size,
+    fileLastModified: file.lastModified || 0,
+    sourceType,
     sourceUrl,
+    toc: [],
     sections: [],
     sectionHeights: [],
     sectionOffsets: [0],
@@ -195,7 +200,7 @@ function appendSections(docId, sections) {
   }
 
   sections.forEach((section) => {
-    section.renderedHtml = "";
+    section.renderedHtml = section.renderedHtml || "";
     currentDocState.sectionIndexById.set(section.sectionId, currentDocState.sections.length);
     currentDocState.sections.push(section);
     currentDocState.sectionHeights.push(estimateSectionHeight(section));
@@ -243,7 +248,7 @@ function setupVirtualizedRoot() {
 
 function estimateSectionHeight(section) {
   const lineCount = (section.markdown?.match(/\n/g)?.length || 0) + 1;
-  return Math.min(Math.max(lineCount * 22, 120), 900);
+  return Math.min(Math.max(lineCount * 16, 120), 520);
 }
 
 function rebuildSectionOffsets() {
@@ -279,9 +284,8 @@ function getVisibleRange() {
 
   const offsets = currentDocState.sectionOffsets;
   const sectionCount = currentDocState.sections.length;
-  const rootTop = contentRoot.getBoundingClientRect().top + window.scrollY;
-  const viewportTop = window.scrollY - rootTop;
-  const viewportBottom = viewportTop + window.innerHeight;
+  const viewportTop = contentRoot.scrollTop;
+  const viewportBottom = viewportTop + contentRoot.clientHeight;
   const from = Math.max(0, viewportTop - OVERSCAN_PX);
   const to = Math.max(from, viewportBottom + OVERSCAN_PX);
   const startIndex = Math.max(Math.min(lowerBound(offsets, from) - 1, sectionCount - 1), 0);
@@ -366,7 +370,8 @@ function syncMeasuredHeights() {
       return;
     }
     const measured = Math.max(node.offsetHeight, 80);
-    if (Math.abs((currentDocState.sectionHeights[idx] || DEFAULT_SECTION_HEIGHT) - measured) > 4) {
+    const previous = currentDocState.sectionHeights[idx] || DEFAULT_SECTION_HEIGHT;
+    if (measured > previous + 4) {
       currentDocState.sectionHeights[idx] = measured;
       changed = true;
     }
@@ -408,24 +413,33 @@ function scrollToSection(sectionId) {
   }
 
   pendingTocSectionId = sectionId;
-  const rootTop = contentRoot.getBoundingClientRect().top + window.scrollY;
   const topOffset = currentDocState.sectionOffsets[idx] || 0;
-  window.scrollTo({
-    top: Math.max(rootTop + topOffset - 12, 0),
+  contentRoot.scrollTo({
+    top: Math.max(topOffset - 12, 0),
     behavior: "smooth"
   });
   scheduleVirtualRender();
 }
 
-async function parseAndRenderText({ text, docId, fileName, fileSize, sourceUrl = "" }) {
+async function parseAndRenderText({
+  text,
+  docId,
+  fileName,
+  fileSize,
+  fileLastModified = 0,
+  sourceUrl = "",
+  sourceType = "fileHandle"
+}) {
   currentRawText = text;
   resetRenderState(
     docId,
     {
       name: fileName,
-      size: fileSize
+      size: fileSize,
+      lastModified: fileLastModified
     },
-    sourceUrl
+    sourceUrl,
+    sourceType
   );
   updateStatus(`Parsing: ${fileName} (${fileSize.toLocaleString()} bytes) / docId: ${docId}`);
   parserWorker.postMessage({
@@ -436,14 +450,103 @@ async function parseAndRenderText({ text, docId, fileName, fileSize, sourceUrl =
   });
 }
 
+function materializeCachedSections(cachedSections) {
+  return cachedSections.map((row) => ({
+    sectionId: row.sectionId,
+    order: row.order,
+    headerLevel: row.headerLevel,
+    headerText: row.headerText,
+    startOffset: row.range?.start ?? 0,
+    endOffset: row.range?.end ?? 0,
+    markdown: "",
+    plainTextPreview: row.plainTextPreview || "",
+    renderedHtml: row.html || ""
+  }));
+}
+
+function isFileChanged(cachedFileMeta, file) {
+  if (!cachedFileMeta) {
+    return true;
+  }
+  return (
+    Number(cachedFileMeta.lastModified || 0) !== Number(file.lastModified || 0) ||
+    Number(cachedFileMeta.size || 0) !== Number(file.size || 0)
+  );
+}
+
+async function renderFromCache({ docId, file, sourceUrl = "", sourceType = "fileHandle" }) {
+  const cached = await getDocumentCache(docId);
+  if (!cached) {
+    return { loaded: false, stale: true };
+  }
+
+  currentRawText = "";
+  resetRenderState(docId, file, sourceUrl, sourceType);
+  appendSections(docId, materializeCachedSections(cached.sections));
+  renderToc({ toc: cached.doc.toc || [] });
+  currentDocState.toc = cached.doc.toc || [];
+  await touchDocument(docId, {
+    title: file.name,
+    sourceType,
+    sourceUrl: sourceUrl || ""
+  });
+  const stale = sourceType === "fileUrl" ? false : isFileChanged(cached.doc.fileMeta, file);
+  updateStatus(
+    stale
+      ? `Loaded from cache: ${file.name}. Refreshing in background...`
+      : `Loaded from cache: ${file.name} (${file.size.toLocaleString()} bytes)`
+  );
+  return { loaded: true, stale };
+}
+
 async function parseAndRenderDocument(file, docId, sourceUrl = "") {
+  const sourceType = sourceUrl ? "fileUrl" : "fileHandle";
+  const cachedResult = await renderFromCache({ docId, file, sourceUrl, sourceType });
+  if (cachedResult.loaded && !cachedResult.stale) {
+    return;
+  }
+
   const text = await file.text();
+  currentRawText = text;
   await parseAndRenderText({
     text,
     docId,
     fileName: file.name,
     fileSize: file.size,
-    sourceUrl
+    fileLastModified: file.lastModified || 0,
+    sourceUrl,
+    sourceType
+  });
+}
+
+async function saveCurrentDocCache(toc = []) {
+  if (!currentDocState?.docId || !currentDocState.sections.length) {
+    return;
+  }
+
+  const sections = currentDocState.sections.map((section) => ({
+    sectionId: section.sectionId,
+    order: section.order,
+    headerLevel: section.headerLevel ?? null,
+    headerText: section.headerText || "",
+    startOffset: section.startOffset ?? 0,
+    endOffset: section.endOffset ?? 0,
+    plainTextPreview: section.plainTextPreview || "",
+    html: getSectionHtml(section)
+  }));
+
+  await saveDocumentCache({
+    docId: currentDocState.docId,
+    title: currentDocState.fileName,
+    sourceType: currentDocState.sourceType || "fileHandle",
+    sourceUrl: currentDocState.sourceUrl || "",
+    fileMeta: {
+      name: currentDocState.fileName,
+      size: currentDocState.fileSize,
+      lastModified: currentDocState.fileLastModified || 0
+    },
+    toc: toc || currentDocState.toc || [],
+    sections
   });
 }
 
@@ -476,7 +579,9 @@ async function openFromSourceUrl(sourceUrl) {
       docId,
       fileName,
       fileSize,
-      sourceUrl
+      fileLastModified: 0,
+      sourceUrl,
+      sourceType: "fileUrl"
     });
 
     const docs = await upsertRecentDoc({
@@ -626,9 +731,13 @@ parserWorker.addEventListener("message", (event) => {
 
   if (type === "PARSE_DONE") {
     renderToc(meta);
+    currentDocState.toc = meta?.toc || [];
     updateStatus(
       `Loaded: ${currentDocState.fileName} (${currentDocState.fileSize.toLocaleString()} bytes) / ${currentDocState.sections.length} sections`
     );
+    void saveCurrentDocCache(currentDocState.toc).catch((cacheError) => {
+      console.error(cacheError);
+    });
     return;
   }
 
@@ -639,8 +748,13 @@ parserWorker.addEventListener("message", (event) => {
   }
 });
 
-window.addEventListener("scroll", scheduleVirtualRender, { passive: true });
+contentRoot.addEventListener("scroll", scheduleVirtualRender, { passive: true });
 window.addEventListener("resize", scheduleVirtualRender);
+window.addEventListener("pagehide", () => {
+  void setCacheMeta("lastCleanupRequestAt", Date.now()).catch((error) => {
+    console.error(error);
+  });
+});
 
 async function initializeViewer() {
   await loadAndRenderRecents();
