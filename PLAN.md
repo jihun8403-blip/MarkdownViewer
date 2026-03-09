@@ -1,4 +1,4 @@
-﻿# Markdown Viewer v1 구현 계획 (PLAN)
+# Markdown Viewer v1 구현 계획 (PLAN)
 
 기준 문서: `PRD.md`  
 작성일: 2026-02-20
@@ -18,7 +18,7 @@
 | P3 | Worker 파싱 + 섹션 점진 렌더 | DONE | 대용량에서 메인스레드 블로킹 최소화 |
 | P4 | 섹션 가상화 + TOC | DONE | 스크롤 안정성/DOM 수 제어 |
 | P5 | IndexedDB 캐시(문서/섹션) | DONE | 재오픈 성능 개선 |
-| P6 | 프리셋 CRUD + 문서 매핑 | TODO | 문서별 스타일 적용 |
+| P6 | 프리셋 CRUD + 문서 매핑 | DONE | 문서별 스타일 적용 |
 | P7 | 프리셋 Export/Import(JSON) | TODO | 백업/복원 |
 | P8 | 캐시 정리(TTL/LRU/용량) + pagehide 예약 | TODO | 저장소 과증가 방지 |
 | P9 | file:// 안내/권한 가이드 + 재선택 fallback | IN_PROGRESS | 정책 제약 내 UX 완성 |
@@ -90,13 +90,13 @@
 - [x] 재오픈 속도 개선 확인 (구조 구현, 실측은 P10)
 
 ### P6. 프리셋 CRUD + 문서 매핑
-상태: `TODO`
-- [ ] presets/doc_preset 스키마
-- [ ] 프리셋 생성/수정/삭제/복제
-- [ ] 문서별 preset 적용/전환
+상태: `DONE`
+- [x] presets/doc_preset 스키마
+- [x] 프리셋 생성/수정/삭제/복제
+- [x] 문서별 preset 적용/전환
 
 완료 기준
-- [ ] 프리셋 변경 즉시 렌더 반영
+- [x] 프리셋 변경 즉시 렌더 반영
 
 ### P7. 프리셋 Export/Import
 상태: `TODO`
@@ -149,6 +149,7 @@
 - 2026-02-20: P4 구현 완료(`viewer.js` 가상화 렌더/상하 placeholder/TOC 점프 연동, `styles/viewer.css` placeholder 스타일 추가).
 - 2026-02-20: P9 1차 구현(`content/file_redirect.js`로 `file://*.md` 자동 리다이렉트, `viewer.js` `?src=` 자동 로드/실패 재선택 안내).
 - 2026-02-21: P5 구현 완료(`storage/db.js` IndexedDB 스키마/CRUD, `viewer.js` 캐시 우선 렌더 + 변경 감지 백그라운드 재파싱 + `pagehide` cleanup 예약 플래그 기록).
+- 2026-03-06: P6 구현 완료(`storage/db.js` presets/doc_preset 스키마·CRUD, `storage/presets.js` 프리셋 래퍼·기본값, `viewer.js` 프리셋 드롭다운·즉시 적용, `options` 프리셋 관리자 UI).
 
 ## 현재 작업
 - `IN_PROGRESS`: P9 file:// 안내/권한 가이드 + 재선택 fallback

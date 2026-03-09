@@ -30,3 +30,105 @@ section {
   background: #ffffff;
   margin-bottom: 12px;
 }
+
+.preset-section .preset-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.preset-section .preset-toolbar button {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.preset-section .preset-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preset-list-wrap {
+  margin-bottom: 16px;
+}
+
+.preset-list-wrap ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.preset-list-wrap li {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  background: #f8fafc;
+}
+
+.preset-list-wrap li:hover {
+  background: #f1f5f9;
+}
+
+.preset-list-wrap li.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.preset-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fafafa;
+  margin-top: 12px;
+}
+
+.preset-editor.hidden {
+  display: none;
+}
+
+.preset-editor label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.preset-editor input[type="text"],
+.preset-editor textarea {
+  width: 100%;
+  max-width: 480px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.preset-editor textarea {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.preset-editor p {
+  margin-bottom: 12px;
+}
+
+.preset-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.preset-editor-actions button,
+.preset-editor #preset-reset-style-btn {
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}

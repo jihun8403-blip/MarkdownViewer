@@ -1,8 +1,10 @@
 export const DB_NAME = "md_viewer_v1";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DOCS_STORE = "docs";
 const SECTIONS_STORE = "sections";
 const CACHE_META_STORE = "cache_meta";
+const PRESETS_STORE = "presets";
+const DOC_PRESET_STORE = "doc_preset";
 
 let dbPromise = null;
 
@@ -39,6 +41,8 @@ export async function openDb() {
       ensureStore(db, DOCS_STORE, { keyPath: "docId" });
       ensureStore(db, SECTIONS_STORE, { keyPath: "pk" });
       ensureStore(db, CACHE_META_STORE, { keyPath: "key" });
+      ensureStore(db, PRESETS_STORE, { keyPath: "presetId" });
+      ensureStore(db, DOC_PRESET_STORE, { keyPath: "docId" });
 
       const docsStore = request.transaction.objectStore(DOCS_STORE);
       if (!docsStore.indexNames.contains("lastOpenedAt")) {
@@ -158,5 +162,70 @@ export async function setCacheMeta(key, value) {
   const db = await openDb();
   const tx = db.transaction(CACHE_META_STORE, "readwrite");
   tx.objectStore(CACHE_META_STORE).put({ key, value, updatedAt: Date.now() });
+  await transactionToPromise(tx);
+}
+
+// --- Presets ---
+export async function getAllPresets() {
+  const db = await openDb();
+  const tx = db.transaction(PRESETS_STORE, "readonly");
+  const list = await requestToPromise(tx.objectStore(PRESETS_STORE).getAll());
+  await transactionToPromise(tx);
+  return list;
+}
+
+export async function getPreset(presetId) {
+  const db = await openDb();
+  const tx = db.transaction(PRESETS_STORE, "readonly");
+  const row = await requestToPromise(tx.objectStore(PRESETS_STORE).get(presetId));
+  await transactionToPromise(tx);
+  return row || null;
+}
+
+export async function putPreset(preset) {
+  const db = await openDb();
+  const now = Date.now();
+  const tx = db.transaction(PRESETS_STORE, "readwrite");
+  const store = tx.objectStore(PRESETS_STORE);
+  const toPut = {
+    presetId: preset.presetId,
+    name: preset.name ?? "Unnamed",
+    version: preset.version ?? 1,
+    styleJson: preset.styleJson ?? {},
+    createdAt: preset.createdAt ?? now,
+    updatedAt: now
+  };
+  store.put(toPut);
+  await transactionToPromise(tx);
+  return toPut;
+}
+
+export async function deletePreset(presetId) {
+  const db = await openDb();
+  const tx = db.transaction(PRESETS_STORE, "readwrite");
+  tx.objectStore(PRESETS_STORE).delete(presetId);
+  await transactionToPromise(tx);
+}
+
+// --- Doc-Preset mapping ---
+export async function getDocPreset(docId) {
+  const db = await openDb();
+  const tx = db.transaction(DOC_PRESET_STORE, "readonly");
+  const row = await requestToPromise(tx.objectStore(DOC_PRESET_STORE).get(docId));
+  await transactionToPromise(tx);
+  return row?.presetId ?? null;
+}
+
+export async function setDocPreset(docId, presetId) {
+  const db = await openDb();
+  const tx = db.transaction(DOC_PRESET_STORE, "readwrite");
+  tx.objectStore(DOC_PRESET_STORE).put({ docId, presetId });
+  await transactionToPromise(tx);
+}
+
+export async function clearDocPreset(docId) {
+  const db = await openDb();
+  const tx = db.transaction(DOC_PRESET_STORE, "readwrite");
+  tx.objectStore(DOC_PRESET_STORE).delete(docId);
   await transactionToPromise(tx);
 }

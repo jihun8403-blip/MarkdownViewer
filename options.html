@@ -9,9 +9,35 @@
   <body>
     <main class="container">
       <h1>Markdown Viewer Options</h1>
-      <section>
+      <section class="preset-section">
         <h2>Preset Manager</h2>
-        <p>Preset CRUD will be implemented in P6.</p>
+        <p>Create and edit style presets. Use the preset dropdown in the viewer to apply a preset to the current document.</p>
+        <div class="preset-toolbar">
+          <button type="button" id="preset-create-btn">Create</button>
+          <button type="button" id="preset-edit-btn" disabled>Edit</button>
+          <button type="button" id="preset-duplicate-btn" disabled>Duplicate</button>
+          <button type="button" id="preset-delete-btn" disabled>Delete</button>
+        </div>
+        <div class="preset-list-wrap">
+          <ul id="preset-list"></ul>
+        </div>
+        <div id="preset-editor" class="preset-editor hidden">
+          <h3 id="preset-editor-title">Edit Preset</h3>
+          <input type="hidden" id="preset-edit-id" />
+          <p>
+            <label for="preset-name">Name</label>
+            <input type="text" id="preset-name" placeholder="Preset name" />
+          </p>
+          <p>
+            <label for="preset-style-json">Style (JSON)</label>
+            <textarea id="preset-style-json" rows="14" placeholder="styleJson"></textarea>
+            <button type="button" id="preset-reset-style-btn">Reset to default style</button>
+          </p>
+          <div class="preset-editor-actions">
+            <button type="button" id="preset-save-btn">Save</button>
+            <button type="button" id="preset-cancel-btn">Cancel</button>
+          </div>
+        </div>
       </section>
       <section>
         <h2>Import / Export</h2>

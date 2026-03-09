@@ -1,14 +1,21 @@
 import { getDocumentCache, saveDocumentCache, setCacheMeta, touchDocument } from "./storage/db.js";
+import {
+  listPresets,
+  getPresetOrDefault,
+  getDocPreset,
+  setDocPreset,
+  clearDocPreset,
+  ensureDefaultPreset,
+  DEFAULT_PRESET_ID
+} from "./storage/presets.js";
 
 const RECENT_DOCS_KEY = "recent_docs_v1";
 const MAX_RECENTS = 20;
 const HANDLE_DB_NAME = "md_viewer_handles_v1";
 const HANDLE_STORE = "handles";
-const DEFAULT_SECTION_HEIGHT = 280;
-const OVERSCAN_PX = 800;
-
 const openFileButton = document.getElementById("open-file-btn");
 const refreshButton = document.getElementById("refresh-btn");
+const presetSelect = document.getElementById("preset-select");
 const statusLine = document.getElementById("status-line");
 const contentRoot = document.getElementById("content-root");
 const recentList = document.getElementById("recent-list");
@@ -25,10 +32,6 @@ const markdownRenderer =
 const parserWorker = new Worker("worker/markdown_worker.js", { type: "classic" });
 let currentDocState = null;
 let currentRawText = "";
-let virtualTopSpacer = null;
-let virtualWindow = null;
-let virtualBottomSpacer = null;
-let virtualRenderScheduled = false;
 let pendingTocSectionId = null;
 
 function isMarkdownPath(path) {
@@ -170,6 +173,92 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
+/** Apply preset.styleJson to #content-root as CSS custom properties for immediate render update */
+function applyPresetStyles(preset) {
+  if (!preset?.styleJson || !contentRoot) {
+    return;
+  }
+  const s = preset.styleJson;
+  const root = contentRoot;
+
+  root.style.setProperty("--preset-font-family", s.fontFamily ?? "");
+  root.style.setProperty("--preset-font-size", s.fontSize ?? "");
+  root.style.setProperty("--preset-line-height", s.lineHeight ?? "");
+  root.style.setProperty("--preset-content-max-width", s.contentMaxWidth ?? "none");
+  root.style.setProperty("--preset-code-font-family", s.codeFontFamily ?? "");
+
+  const tags = s.tags || {};
+  for (const [tag, style] of Object.entries(tags)) {
+    if (!style || typeof style !== "object") continue;
+    const prefix = `--preset-${tag.replace(/^h(\d)$/, "h$1")}`;
+    if (style.fontSize) root.style.setProperty(`${prefix}-font-size`, style.fontSize);
+    if (style.fontWeight) root.style.setProperty(`${prefix}-font-weight`, style.fontWeight);
+    if (style.fontFamily) root.style.setProperty(`${prefix}-font-family`, style.fontFamily);
+    if (style.marginTop !== undefined) root.style.setProperty(`${prefix}-margin-top`, style.marginTop);
+    if (style.marginBottom !== undefined) root.style.setProperty(`${prefix}-margin-bottom`, style.marginBottom);
+    if (tag === "pre") {
+      if (style.padding) root.style.setProperty("--preset-pre-padding", style.padding);
+      if (style.borderRadius) root.style.setProperty("--preset-pre-border-radius", style.borderRadius);
+      if (style.border) root.style.setProperty("--preset-pre-border", style.border);
+      if (style.background) root.style.setProperty("--preset-pre-background", style.background);
+    }
+    if (tag === "blockquote") {
+      if (style.padding) root.style.setProperty("--preset-blockquote-padding", style.padding);
+      if (style.borderLeft) root.style.setProperty("--preset-blockquote-border-left", style.borderLeft);
+      if (style.background) root.style.setProperty("--preset-blockquote-background", style.background);
+    }
+    if (tag === "th" || tag === "td") {
+      if (style.border) root.style.setProperty("--preset-td-border", style.border);
+      if (style.padding) root.style.setProperty("--preset-td-padding", style.padding);
+    }
+  }
+}
+
+async function loadPresetForDoc(docId) {
+  const presetId = (await getDocPreset(docId)) || DEFAULT_PRESET_ID;
+  const preset = await getPresetOrDefault(presetId);
+  if (preset) {
+    applyPresetStyles(preset);
+  }
+  return preset;
+}
+
+async function refreshPresetSelect(docId) {
+  const presets = await listPresets();
+  presetSelect.innerHTML = "";
+  const defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = "— Default —";
+  presetSelect.appendChild(defaultOpt);
+  for (const p of presets) {
+    const opt = document.createElement("option");
+    opt.value = p.presetId;
+    opt.textContent = p.name;
+    presetSelect.appendChild(opt);
+  }
+  if (docId) {
+    const mapped = await getDocPreset(docId);
+    presetSelect.value = mapped || "";
+  } else {
+    presetSelect.value = "";
+  }
+  presetSelect.disabled = !docId;
+}
+
+async function onPresetChange() {
+  if (!currentDocState?.docId) return;
+  const value = presetSelect.value;
+  if (value) {
+    await setDocPreset(currentDocState.docId, value);
+  } else {
+    await clearDocPreset(currentDocState.docId);
+  }
+  const preset = await getPresetOrDefault(value || DEFAULT_PRESET_ID);
+  if (preset) {
+    applyPresetStyles(preset);
+  }
+}
+
 function updateStatus(message) {
   statusLine.textContent = message;
 }
@@ -184,13 +273,9 @@ function resetRenderState(docId, file, sourceUrl = "", sourceType = "fileHandle"
     sourceUrl,
     toc: [],
     sections: [],
-    sectionHeights: [],
-    sectionOffsets: [0],
-    sectionIndexById: new Map(),
-    visibleStart: -1,
-    visibleEnd: -1
+    sectionIndexById: new Map()
   };
-  setupVirtualizedRoot();
+  contentRoot.innerHTML = "";
   tocList.innerHTML = "<li>Parsing...</li>";
 }
 
@@ -203,10 +288,8 @@ function appendSections(docId, sections) {
     section.renderedHtml = section.renderedHtml || "";
     currentDocState.sectionIndexById.set(section.sectionId, currentDocState.sections.length);
     currentDocState.sections.push(section);
-    currentDocState.sectionHeights.push(estimateSectionHeight(section));
   });
-  rebuildSectionOffsets();
-  scheduleVirtualRender();
+  renderAllSections();
 }
 
 function renderToc(meta) {
@@ -231,68 +314,6 @@ function renderToc(meta) {
   });
 }
 
-function setupVirtualizedRoot() {
-  contentRoot.innerHTML = "";
-  virtualTopSpacer = document.createElement("div");
-  virtualTopSpacer.className = "virtual-spacer virtual-spacer-top";
-  virtualTopSpacer.setAttribute("aria-hidden", "true");
-  virtualWindow = document.createElement("div");
-  virtualWindow.className = "virtual-window";
-  virtualBottomSpacer = document.createElement("div");
-  virtualBottomSpacer.className = "virtual-spacer virtual-spacer-bottom";
-  virtualBottomSpacer.setAttribute("aria-hidden", "true");
-  contentRoot.appendChild(virtualTopSpacer);
-  contentRoot.appendChild(virtualWindow);
-  contentRoot.appendChild(virtualBottomSpacer);
-}
-
-function estimateSectionHeight(section) {
-  const lineCount = (section.markdown?.match(/\n/g)?.length || 0) + 1;
-  return Math.min(Math.max(lineCount * 16, 120), 520);
-}
-
-function rebuildSectionOffsets() {
-  if (!currentDocState) {
-    return;
-  }
-
-  const offsets = [0];
-  for (let i = 0; i < currentDocState.sectionHeights.length; i += 1) {
-    offsets.push(offsets[i] + currentDocState.sectionHeights[i]);
-  }
-  currentDocState.sectionOffsets = offsets;
-}
-
-function lowerBound(sortedArray, target) {
-  let lo = 0;
-  let hi = sortedArray.length;
-  while (lo < hi) {
-    const mid = lo + Math.floor((hi - lo) / 2);
-    if (sortedArray[mid] < target) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  return lo;
-}
-
-function getVisibleRange() {
-  if (!currentDocState || !currentDocState.sections.length) {
-    return { start: 0, end: -1 };
-  }
-
-  const offsets = currentDocState.sectionOffsets;
-  const sectionCount = currentDocState.sections.length;
-  const viewportTop = contentRoot.scrollTop;
-  const viewportBottom = viewportTop + contentRoot.clientHeight;
-  const from = Math.max(0, viewportTop - OVERSCAN_PX);
-  const to = Math.max(from, viewportBottom + OVERSCAN_PX);
-  const startIndex = Math.max(Math.min(lowerBound(offsets, from) - 1, sectionCount - 1), 0);
-  const endIndex = Math.max(Math.min(lowerBound(offsets, to) - 1, sectionCount - 1), startIndex);
-  return { start: startIndex, end: endIndex };
-}
-
 function getSectionHtml(section) {
   if (!section.renderedHtml) {
     section.renderedHtml = renderMarkdown(section.markdown || section.plainTextPreview || "");
@@ -300,88 +321,20 @@ function getSectionHtml(section) {
   return section.renderedHtml;
 }
 
-function applySpacerState(spacer, heightPx, skippedCount, position) {
-  spacer.style.height = `${Math.max(0, Math.floor(heightPx))}px`;
-  spacer.textContent = skippedCount > 0 ? `... ${skippedCount} sections ${position} ...` : "";
-  spacer.classList.toggle("active", skippedCount > 0);
-}
-
-function renderVirtualSections() {
-  if (!currentDocState || !virtualWindow) {
+function renderAllSections() {
+  if (!currentDocState || !contentRoot) {
     return;
   }
-
-  const totalSections = currentDocState.sections.length;
-  if (!totalSections) {
-    applySpacerState(virtualTopSpacer, 0, 0, "above");
-    applySpacerState(virtualBottomSpacer, 0, 0, "below");
-    virtualWindow.innerHTML = "";
-    currentDocState.visibleStart = -1;
-    currentDocState.visibleEnd = -1;
-    return;
+  contentRoot.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  for (const section of currentDocState.sections) {
+    const container = document.createElement("section");
+    container.className = "md-section";
+    container.id = section.sectionId;
+    container.innerHTML = getSectionHtml(section);
+    fragment.appendChild(container);
   }
-
-  const { start, end } = getVisibleRange();
-  const rangeChanged = start !== currentDocState.visibleStart || end !== currentDocState.visibleEnd;
-  if (rangeChanged) {
-    currentDocState.visibleStart = start;
-    currentDocState.visibleEnd = end;
-    const fragment = document.createDocumentFragment();
-    for (let i = start; i <= end; i += 1) {
-      const section = currentDocState.sections[i];
-      const container = document.createElement("section");
-      container.className = "md-section";
-      container.id = section.sectionId;
-      container.dataset.sectionIndex = String(i);
-      container.innerHTML = getSectionHtml(section);
-      fragment.appendChild(container);
-    }
-
-    virtualWindow.innerHTML = "";
-    virtualWindow.appendChild(fragment);
-  }
-
-  const offsets = currentDocState.sectionOffsets;
-  const topHeight = offsets[start];
-  const bottomHeight = offsets[totalSections] - offsets[end + 1];
-  applySpacerState(virtualTopSpacer, topHeight, start, "above");
-  applySpacerState(virtualBottomSpacer, bottomHeight, totalSections - end - 1, "below");
-  if (rangeChanged) {
-    syncMeasuredHeights();
-  } else if (pendingTocSectionId) {
-    const target = document.getElementById(pendingTocSectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      pendingTocSectionId = null;
-    }
-  }
-}
-
-function syncMeasuredHeights() {
-  if (!currentDocState || !virtualWindow?.children.length) {
-    return;
-  }
-
-  let changed = false;
-  const nodes = virtualWindow.querySelectorAll("[data-section-index]");
-  nodes.forEach((node) => {
-    const idx = Number(node.dataset.sectionIndex);
-    if (!Number.isInteger(idx)) {
-      return;
-    }
-    const measured = Math.max(node.offsetHeight, 80);
-    const previous = currentDocState.sectionHeights[idx] || DEFAULT_SECTION_HEIGHT;
-    if (measured > previous + 4) {
-      currentDocState.sectionHeights[idx] = measured;
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    rebuildSectionOffsets();
-    scheduleVirtualRender();
-  }
-
+  contentRoot.appendChild(fragment);
   if (pendingTocSectionId) {
     const target = document.getElementById(pendingTocSectionId);
     if (target) {
@@ -391,34 +344,13 @@ function syncMeasuredHeights() {
   }
 }
 
-function scheduleVirtualRender() {
-  if (virtualRenderScheduled) {
-    return;
-  }
-  virtualRenderScheduled = true;
-  requestAnimationFrame(() => {
-    virtualRenderScheduled = false;
-    renderVirtualSections();
-  });
-}
-
 function scrollToSection(sectionId) {
-  if (!currentDocState) {
+  const target = document.getElementById(sectionId);
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-
-  const idx = currentDocState.sectionIndexById.get(sectionId);
-  if (idx === undefined) {
-    return;
-  }
-
   pendingTocSectionId = sectionId;
-  const topOffset = currentDocState.sectionOffsets[idx] || 0;
-  contentRoot.scrollTo({
-    top: Math.max(topOffset - 12, 0),
-    behavior: "smooth"
-  });
-  scheduleVirtualRender();
 }
 
 async function parseAndRenderText({
@@ -496,6 +428,8 @@ async function renderFromCache({ docId, file, sourceUrl = "", sourceType = "file
       ? `Loaded from cache: ${file.name}. Refreshing in background...`
       : `Loaded from cache: ${file.name} (${file.size.toLocaleString()} bytes)`
   );
+  await loadPresetForDoc(docId);
+  await refreshPresetSelect(docId);
   return { loaded: true, stale };
 }
 
@@ -706,6 +640,7 @@ async function reopenRecentDoc(doc) {
   }
 }
 
+presetSelect.addEventListener("change", () => void onPresetChange());
 openFileButton.addEventListener("click", () => void openMarkdownFile());
 refreshButton.addEventListener("click", () => {
   if (!currentDocState) {
@@ -735,6 +670,7 @@ parserWorker.addEventListener("message", (event) => {
     updateStatus(
       `Loaded: ${currentDocState.fileName} (${currentDocState.fileSize.toLocaleString()} bytes) / ${currentDocState.sections.length} sections`
     );
+    void loadPresetForDoc(currentDocState.docId).then(() => refreshPresetSelect(currentDocState.docId));
     void saveCurrentDocCache(currentDocState.toc).catch((cacheError) => {
       console.error(cacheError);
     });
@@ -748,8 +684,6 @@ parserWorker.addEventListener("message", (event) => {
   }
 });
 
-contentRoot.addEventListener("scroll", scheduleVirtualRender, { passive: true });
-window.addEventListener("resize", scheduleVirtualRender);
 window.addEventListener("pagehide", () => {
   void setCacheMeta("lastCleanupRequestAt", Date.now()).catch((error) => {
     console.error(error);
@@ -757,6 +691,8 @@ window.addEventListener("pagehide", () => {
 });
 
 async function initializeViewer() {
+  await ensureDefaultPreset();
+  await refreshPresetSelect(null);
   await loadAndRenderRecents();
   const sourceUrl = getSourceUrlFromQuery();
   if (sourceUrl) {

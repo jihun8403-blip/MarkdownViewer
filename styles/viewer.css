@@ -37,6 +37,27 @@ body {
   gap: 8px;
 }
 
+.preset-label {
+  font-size: 13px;
+  color: #64748b;
+  align-self: center;
+  margin-right: 4px;
+}
+
+.preset-select {
+  min-width: 120px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.preset-select:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .actions button {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -98,8 +119,16 @@ body {
 }
 
 #content-root {
-  line-height: 1.6;
-  font-size: 15px;
+  /* Preset-driven (overridden by JS) */
+  --preset-font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+  --preset-font-size: 15px;
+  --preset-line-height: 1.6;
+  --preset-content-max-width: none;
+  --preset-code-font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-family: var(--preset-font-family);
+  line-height: var(--preset-line-height);
+  font-size: var(--preset-font-size);
+  max-width: var(--preset-content-max-width);
   overflow: auto;
   overscroll-behavior: contain;
   min-height: 0;
@@ -109,15 +138,15 @@ body {
 
 #content-root pre,
 #content-root code {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-family: var(--preset-code-font-family);
 }
 
 #content-root pre {
   overflow: auto;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  padding: var(--preset-pre-padding, 12px);
+  border-radius: var(--preset-pre-border-radius, 8px);
+  border: var(--preset-pre-border, 1px solid #e2e8f0);
+  background: var(--preset-pre-background, #f8fafc);
 }
 
 #content-root table {
@@ -129,46 +158,30 @@ body {
 
 #content-root th,
 #content-root td {
-  border: 1px solid #dbe3ef;
-  padding: 8px 10px;
+  border: var(--preset-td-border, 1px solid #dbe3ef);
+  padding: var(--preset-td-padding, 8px 10px);
   vertical-align: top;
   word-break: break-word;
 }
 
 #content-root blockquote {
   margin: 0;
-  padding: 8px 12px;
-  border-left: 4px solid #cbd5e1;
-  background: #f8fafc;
+  padding: var(--preset-blockquote-padding, 8px 12px);
+  border-left: var(--preset-blockquote-border-left, 4px solid #cbd5e1);
+  background: var(--preset-blockquote-background, #f8fafc);
 }
+
+#content-root h1 { font-size: var(--preset-h1-font-size, 1.75em); font-weight: var(--preset-h1-font-weight, 700); margin-top: var(--preset-h1-margin-top); margin-bottom: var(--preset-h1-margin-bottom); }
+#content-root h2 { font-size: var(--preset-h2-font-size, 1.4em); font-weight: var(--preset-h2-font-weight, 600); margin-top: var(--preset-h2-margin-top); margin-bottom: var(--preset-h2-margin-bottom); }
+#content-root h3 { font-size: var(--preset-h3-font-size, 1.2em); font-weight: var(--preset-h3-font-weight, 600); margin-top: var(--preset-h3-margin-top); margin-bottom: var(--preset-h3-margin-bottom); }
+#content-root h4 { font-size: var(--preset-h4-font-size, 1.1em); font-weight: var(--preset-h4-font-weight, 600); margin-top: var(--preset-h4-margin-top); margin-bottom: var(--preset-h4-margin-bottom); }
+#content-root h5 { font-size: var(--preset-h5-font-size, 1em); font-weight: var(--preset-h5-font-weight, 600); margin-top: var(--preset-h5-margin-top); margin-bottom: var(--preset-h5-margin-bottom); }
+#content-root h6 { font-size: var(--preset-h6-font-size, 0.95em); font-weight: var(--preset-h6-font-weight, 600); margin-top: var(--preset-h6-margin-top); margin-bottom: var(--preset-h6-margin-bottom); }
+#content-root .md-section p { font-size: var(--preset-p-font-size, 1em); margin-top: var(--preset-p-margin-top); margin-bottom: var(--preset-p-margin-bottom); }
+#content-root code { font-size: var(--preset-code-font-size, 0.9em); }
 
 .md-section {
   margin-bottom: 18px;
-}
-
-.virtual-window {
-  min-height: 12px;
-}
-
-.virtual-spacer {
-  position: relative;
-}
-
-.virtual-spacer.active {
-  display: flex;
-  color: #64748b;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
-
-.virtual-spacer-top.active {
-  align-items: flex-end;
-  padding-bottom: 8px;
-}
-
-.virtual-spacer-bottom.active {
-  align-items: flex-start;
-  padding-top: 8px;
 }
 
 .toc-panel,
