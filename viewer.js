@@ -6,7 +6,8 @@ import {
   setDocPreset,
   clearDocPreset,
   ensureDefaultPreset,
-  DEFAULT_PRESET_ID
+  DEFAULT_PRESET_ID,
+  DEFAULT_STYLE_JSON
 } from "./storage/presets.js";
 
 const RECENT_DOCS_KEY = "recent_docs_v1";
@@ -327,6 +328,15 @@ function applyPresetStyles(preset) {
   }
   const s = preset.styleJson;
   const root = contentRoot;
+  const isDefaultPreset = preset.presetId === DEFAULT_PRESET_ID;
+  const defaultTags = DEFAULT_STYLE_JSON?.tags || {};
+
+  // Clear optional vars first so fallback theme tokens can work.
+  root.style.removeProperty("--preset-pre-border");
+  root.style.removeProperty("--preset-pre-background");
+  root.style.removeProperty("--preset-blockquote-border-left");
+  root.style.removeProperty("--preset-blockquote-background");
+  root.style.removeProperty("--preset-td-border");
 
   root.style.setProperty("--preset-font-family", s.fontFamily ?? "");
   root.style.setProperty("--preset-font-size", s.fontSize ?? "");
@@ -346,16 +356,38 @@ function applyPresetStyles(preset) {
     if (tag === "pre") {
       if (style.padding) root.style.setProperty("--preset-pre-padding", style.padding);
       if (style.borderRadius) root.style.setProperty("--preset-pre-border-radius", style.borderRadius);
-      if (style.border) root.style.setProperty("--preset-pre-border", style.border);
-      if (style.background) root.style.setProperty("--preset-pre-background", style.background);
+      if (
+        style.border &&
+        !(isDefaultPreset && style.border === defaultTags.pre?.border)
+      ) {
+        root.style.setProperty("--preset-pre-border", style.border);
+      }
+      if (
+        style.background &&
+        !(isDefaultPreset && style.background === defaultTags.pre?.background)
+      ) {
+        root.style.setProperty("--preset-pre-background", style.background);
+      }
     }
     if (tag === "blockquote") {
       if (style.padding) root.style.setProperty("--preset-blockquote-padding", style.padding);
-      if (style.borderLeft) root.style.setProperty("--preset-blockquote-border-left", style.borderLeft);
-      if (style.background) root.style.setProperty("--preset-blockquote-background", style.background);
+      if (
+        style.borderLeft &&
+        !(isDefaultPreset && style.borderLeft === defaultTags.blockquote?.borderLeft)
+      ) {
+        root.style.setProperty("--preset-blockquote-border-left", style.borderLeft);
+      }
+      if (
+        style.background &&
+        !(isDefaultPreset && style.background === defaultTags.blockquote?.background)
+      ) {
+        root.style.setProperty("--preset-blockquote-background", style.background);
+      }
     }
     if (tag === "th" || tag === "td") {
-      if (style.border) root.style.setProperty("--preset-td-border", style.border);
+      if (style.border && !(isDefaultPreset && style.border === defaultTags[tag]?.border)) {
+        root.style.setProperty("--preset-td-border", style.border);
+      }
       if (style.padding) root.style.setProperty("--preset-td-padding", style.padding);
     }
   }
