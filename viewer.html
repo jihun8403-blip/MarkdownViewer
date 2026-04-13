@@ -6,7 +6,7 @@
     <title>Markdown Viewer</title>
     <link rel="stylesheet" href="styles/viewer.css" />
   </head>
-  <body>
+  <body class="viewer-body">
     <header class="topbar">
       <h1>Markdown Viewer</h1>
       <div class="actions">
@@ -20,16 +20,45 @@
     </header>
 
     <main class="layout">
-      <aside class="panel toc-panel">
-        <h2>Recent</h2>
-        <ul id="recent-list">
-          <li>No recent documents</li>
-        </ul>
-
-        <h2>TOC</h2>
-        <ul id="toc-list">
-          <li>No document loaded</li>
-        </ul>
+      <aside class="panel sidebar-panel" aria-label="문서 탐색">
+        <div class="sidebar-tabs" role="tablist" aria-label="사이드바 탭">
+          <button
+            id="sidebar-tab-recent"
+            class="sidebar-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="sidebar-panel-recent"
+          >
+            Recent
+          </button>
+          <button
+            id="sidebar-tab-outline"
+            class="sidebar-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="sidebar-panel-outline"
+          >
+            Outline
+          </button>
+        </div>
+        <div
+          id="sidebar-panel-recent"
+          class="sidebar-tab-panel"
+          role="tabpanel"
+          aria-labelledby="sidebar-tab-recent"
+        >
+          <ul id="recent-list" class="nav-tree"></ul>
+        </div>
+        <div
+          id="sidebar-panel-outline"
+          class="sidebar-tab-panel is-hidden"
+          role="tabpanel"
+          aria-labelledby="sidebar-tab-outline"
+        >
+          <ul id="toc-list" class="nav-tree"></ul>
+        </div>
       </aside>
 
       <section class="panel content-panel">

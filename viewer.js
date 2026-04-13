@@ -121,25 +121,149 @@ async function upsertRecentDoc(entry) {
   return next;
 }
 
-function renderRecentDocs(docs) {
-  recentList.innerHTML = "";
-  if (!docs.length) {
-    recentList.innerHTML = "<li>No recent documents</li>";
+function renderNavEmpty(ul, message) {
+  ul.innerHTML = "";
+  const li = document.createElement("li");
+  li.className = "nav-tree-empty";
+  li.textContent = message;
+  ul.appendChild(li);
+}
+
+function makeDirNode(label) {
+  return { label, subdirs: new Map(), files: [] };
+}
+
+function getDocPathSegments(doc) {
+  if (!doc.sourceUrl) {
+    return null;
+  }
+  try {
+    const u = new URL(doc.sourceUrl);
+    const parts = (u.pathname || "").split("/").filter(Boolean);
+    if (!parts.length) {
+      return null;
+    }
+    return parts.map((p) => decodeURIComponent(p.replace(/\+/g, " ")));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function addDocToRecentDirTree(root, doc) {
+  const segments = getDocPathSegments(doc);
+  if (!segments?.length) {
+    root.files.push(doc);
     return;
   }
+  let dir = root;
+  if (segments.length === 1) {
+    dir.files.push({ ...doc, _displayName: segments[0] });
+    return;
+  }
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const seg = segments[i];
+    if (!dir.subdirs.has(seg)) {
+      dir.subdirs.set(seg, makeDirNode(seg));
+    }
+    dir = dir.subdirs.get(seg);
+  }
+  dir.files.push({ ...doc, _displayName: segments[segments.length - 1] });
+}
 
-  docs.forEach((doc) => {
-    const listItem = document.createElement("li");
+function buildRecentDirTree(docs) {
+  const root = makeDirNode("");
+  for (const doc of docs) {
+    addDocToRecentDirTree(root, doc);
+  }
+  return root;
+}
+
+function makeFolderBranch(defaultOpen) {
+  const li = document.createElement("li");
+  li.className = "nav-tree-branch";
+  const folderBtn = document.createElement("button");
+  folderBtn.type = "button";
+  folderBtn.className = "nav-tree-folder-btn";
+  folderBtn.setAttribute("aria-expanded", String(defaultOpen));
+  const chev = document.createElement("span");
+  chev.className = "nav-tree-chevron";
+  chev.setAttribute("aria-hidden", "true");
+  chev.textContent = defaultOpen ? "▼" : "▶";
+  const text = document.createElement("span");
+  text.className = "nav-tree-folder-text";
+  folderBtn.appendChild(chev);
+  folderBtn.appendChild(text);
+  const nestedUl = document.createElement("ul");
+  nestedUl.className = "nav-tree nav-tree-nested";
+  nestedUl.hidden = !defaultOpen;
+  folderBtn.addEventListener("click", () => {
+    const willShow = nestedUl.hidden;
+    nestedUl.hidden = !willShow;
+    folderBtn.setAttribute("aria-expanded", String(willShow));
+    chev.textContent = willShow ? "▼" : "▶";
+  });
+  li.appendChild(folderBtn);
+  li.appendChild(nestedUl);
+  return { li, nestedUl, setLabel: (label) => {
+    text.textContent = label;
+    folderBtn.setAttribute("aria-label", `폴더 ${label} 펼치기`);
+  } };
+}
+
+function renderRecentDirNode(dir, ul, depth) {
+  const subKeys = [...dir.subdirs.keys()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  for (const key of subKeys) {
+    const sub = dir.subdirs.get(key);
+    const { li, nestedUl, setLabel } = makeFolderBranch(depth < 2);
+    setLabel(sub.label);
+    renderRecentDirNode(sub, nestedUl, depth + 1);
+    ul.appendChild(li);
+  }
+  for (const doc of dir.files) {
+    const li = document.createElement("li");
+    li.className = "nav-tree-leaf";
     const button = document.createElement("button");
-    const openedAt = new Date(doc.lastOpenedAt).toLocaleString();
     button.type = "button";
-    button.textContent = `${doc.name} (${openedAt})`;
+    button.className = "nav-tree-link";
+    const name = doc._displayName || doc.name;
+    const openedAt = new Date(doc.lastOpenedAt).toLocaleString();
+    button.textContent = name;
+    button.title = `${name} · ${openedAt}`;
     button.addEventListener("click", () => {
       void reopenRecentDoc(doc);
     });
-    listItem.appendChild(button);
-    recentList.appendChild(listItem);
-  });
+    li.appendChild(button);
+    ul.appendChild(li);
+  }
+}
+
+function renderRecentDocs(docs) {
+  recentList.innerHTML = "";
+  if (!docs.length) {
+    renderNavEmpty(recentList, "No recent documents");
+    return;
+  }
+  const tree = buildRecentDirTree(docs);
+  renderRecentDirNode(tree, recentList, 0);
+}
+
+function setupSidebarTabs() {
+  const tabRecent = document.getElementById("sidebar-tab-recent");
+  const tabOutline = document.getElementById("sidebar-tab-outline");
+  const panelRecent = document.getElementById("sidebar-panel-recent");
+  const panelOutline = document.getElementById("sidebar-panel-outline");
+  if (!tabRecent || !tabOutline || !panelRecent || !panelOutline) {
+    return;
+  }
+  const activate = (which) => {
+    const recent = which === "recent";
+    tabRecent.setAttribute("aria-selected", String(recent));
+    tabOutline.setAttribute("aria-selected", String(!recent));
+    panelRecent.classList.toggle("is-hidden", !recent);
+    panelOutline.classList.toggle("is-hidden", recent);
+  };
+  tabRecent.addEventListener("click", () => activate("recent"));
+  tabOutline.addEventListener("click", () => activate("outline"));
 }
 
 async function loadAndRenderRecents() {
@@ -276,7 +400,7 @@ function resetRenderState(docId, file, sourceUrl = "", sourceType = "fileHandle"
     sectionIndexById: new Map()
   };
   contentRoot.innerHTML = "";
-  tocList.innerHTML = "<li>Parsing...</li>";
+  renderNavEmpty(tocList, "Parsing…");
 }
 
 function appendSections(docId, sections) {
@@ -292,26 +416,91 @@ function appendSections(docId, sections) {
   renderAllSections();
 }
 
+function buildHeadingTree(flatToc) {
+  const root = { children: [], level: 0 };
+  const stack = [root];
+  for (const item of flatToc) {
+    const level = Math.max(1, Math.min(6, item.headerLevel || 1));
+    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1];
+    const node = { item, children: [], level };
+    parent.children.push(node);
+    stack.push(node);
+  }
+  return root.children;
+}
+
+function makeTocBranch(node, defaultOpen) {
+  const li = document.createElement("li");
+  li.className = "nav-tree-branch";
+  const row = document.createElement("div");
+  row.className = "nav-tree-toc-row";
+  const folderBtn = document.createElement("button");
+  folderBtn.type = "button";
+  folderBtn.className = "nav-tree-folder-btn nav-tree-folder-btn--square";
+  folderBtn.setAttribute("aria-expanded", String(defaultOpen));
+  folderBtn.setAttribute("aria-label", "하위 섹션 펼치기");
+  const chev = document.createElement("span");
+  chev.className = "nav-tree-chevron";
+  chev.setAttribute("aria-hidden", "true");
+  chev.textContent = defaultOpen ? "▼" : "▶";
+  folderBtn.appendChild(chev);
+  const linkBtn = document.createElement("button");
+  linkBtn.type = "button";
+  linkBtn.className = "nav-tree-link nav-tree-link--flex";
+  linkBtn.textContent = node.item.headerText;
+  linkBtn.addEventListener("click", () => {
+    scrollToSection(node.item.sectionId);
+  });
+  const nestedUl = document.createElement("ul");
+  nestedUl.className = "nav-tree nav-tree-nested";
+  nestedUl.hidden = !defaultOpen;
+  folderBtn.addEventListener("click", () => {
+    const willShow = nestedUl.hidden;
+    nestedUl.hidden = !willShow;
+    folderBtn.setAttribute("aria-expanded", String(willShow));
+    chev.textContent = willShow ? "▼" : "▶";
+  });
+  row.appendChild(folderBtn);
+  row.appendChild(linkBtn);
+  li.appendChild(row);
+  li.appendChild(nestedUl);
+  return { li, nestedUl };
+}
+
+function renderTocNodes(nodes, ul, depth) {
+  for (const node of nodes) {
+    if (node.children.length) {
+      const { li, nestedUl } = makeTocBranch(node, depth < 2);
+      renderTocNodes(node.children, nestedUl, depth + 1);
+      ul.appendChild(li);
+    } else {
+      const li = document.createElement("li");
+      li.className = "nav-tree-leaf";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nav-tree-link";
+      btn.textContent = node.item.headerText;
+      btn.addEventListener("click", () => {
+        scrollToSection(node.item.sectionId);
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+  }
+}
+
 function renderToc(meta) {
   const toc = meta?.toc || [];
   tocList.innerHTML = "";
   if (!toc.length) {
-    tocList.innerHTML = "<li>No headings found</li>";
+    renderNavEmpty(tocList, "No headings found");
     return;
   }
-
-  toc.forEach((item) => {
-    const listItem = document.createElement("li");
-    listItem.style.marginLeft = `${Math.max((item.headerLevel || 1) - 1, 0) * 10}px`;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = item.headerText;
-    button.addEventListener("click", () => {
-      scrollToSection(item.sectionId);
-    });
-    listItem.appendChild(button);
-    tocList.appendChild(listItem);
-  });
+  const tree = buildHeadingTree(toc);
+  renderTocNodes(tree, tocList, 0);
 }
 
 function getSectionHtml(section) {
@@ -691,6 +880,7 @@ window.addEventListener("pagehide", () => {
 });
 
 async function initializeViewer() {
+  setupSidebarTabs();
   await ensureDefaultPreset();
   await refreshPresetSelect(null);
   await loadAndRenderRecents();
