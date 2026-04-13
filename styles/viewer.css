@@ -48,48 +48,49 @@
   --sidebar-scrollbar-thumb: #94a3b8;
 }
 
+/* Dark: 중립 차콜·거의 검정. 면 색 기준은 #333333 전후, 바깥 셸만 한 단계 더 어둡게. */
 html[data-theme="dark"] {
   color-scheme: dark;
-  --shell-bg: #0f172a;
-  --text-strong: #f1f5f9;
-  --text-muted: #94a3b8;
-  --topbar-bg: #1e293b;
-  --topbar-border: #334155;
-  --control-border: #475569;
-  --control-bg: #0f172a;
-  --control-bg-hover: #334155;
-  --panel-bg: #1e293b;
-  --panel-border: #334155;
-  --sidebar-bg: #1f2937;
-  --sidebar-edge: #374151;
-  --sidebar-tabs-bg: rgba(0, 0, 0, 0.15);
-  --sidebar-tabs-border: rgba(0, 0, 0, 0.25);
-  --sidebar-tab-color: #e5e7eb;
-  --sidebar-tab-hover-bg: #374151;
-  --sidebar-tab-active-bg: #374151;
-  --sidebar-tab-active-color: #ffffff;
-  --nav-folder-btn-bg: rgba(0, 0, 0, 0.22);
-  --nav-folder-btn-hover: #374151;
-  --nav-folder-text: #f9fafb;
-  --nav-link-color: #f3f4f6;
-  --nav-link-hover: #374151;
-  --nav-empty: #9ca3af;
-  --nav-nested-border: rgba(255, 255, 255, 0.08);
-  --status-bg: rgba(30, 58, 138, 0.35);
-  --status-border: #334155;
-  --status-text: #e0e7ff;
-  --content-prose: #e5e7eb;
+  --shell-bg: #262626;
+  --text-strong: #f5f5f5;
+  --text-muted: #a3a3a3;
+  --topbar-bg: #333333;
+  --topbar-border: #404040;
+  --control-border: #525252;
+  --control-bg: #2a2a2a;
+  --control-bg-hover: #404040;
+  --panel-bg: #333333;
+  --panel-border: #404040;
+  --sidebar-bg: #2e2e2e;
+  --sidebar-edge: #404040;
+  --sidebar-tabs-bg: #262626;
+  --sidebar-tabs-border: #404040;
+  --sidebar-tab-color: #d4d4d4;
+  --sidebar-tab-hover-bg: #404040;
+  --sidebar-tab-active-bg: #333333;
+  --sidebar-tab-active-color: #fafafa;
+  --nav-folder-btn-bg: rgba(255, 255, 255, 0.06);
+  --nav-folder-btn-hover: #404040;
+  --nav-folder-text: #f5f5f5;
+  --nav-link-color: #e8e8e8;
+  --nav-link-hover: #404040;
+  --nav-empty: #a3a3a3;
+  --nav-nested-border: rgba(255, 255, 255, 0.1);
+  --status-bg: #383838;
+  --status-border: #525252;
+  --status-text: #e8e8e8;
+  --content-prose: #e8e8e8;
   --content-link: #93c5fd;
-  --theme-pre-bg: #0f172a;
-  --theme-pre-border: 1px solid #334155;
-  --theme-td-border: 1px solid #334155;
-  --theme-blockquote-bg: #1e293b;
-  --theme-blockquote-border: 4px solid #475569;
-  --scrollbar-track: #1e293b;
-  --scrollbar-thumb: #64748b;
-  --scrollbar-thumb-hover: #94a3b8;
-  --sidebar-scrollbar-track: rgba(255, 255, 255, 0.06);
-  --sidebar-scrollbar-thumb: #4b5563;
+  --theme-pre-bg: #262626;
+  --theme-pre-border: 1px solid #404040;
+  --theme-td-border: 1px solid #404040;
+  --theme-blockquote-bg: #2a2a2a;
+  --theme-blockquote-border: 4px solid #525252;
+  --scrollbar-track: #262626;
+  --scrollbar-thumb: #525252;
+  --scrollbar-thumb-hover: #737373;
+  --sidebar-scrollbar-track: #262626;
+  --sidebar-scrollbar-thumb: #525252;
 }
 
 * {
