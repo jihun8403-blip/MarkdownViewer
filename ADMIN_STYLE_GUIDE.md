@@ -539,7 +539,46 @@ div.grid.grid-cols-2.gap-3
 
 ---
 
-## 13. 이식 체크리스트
+## 13. Light / Dark 테마
+
+앱 셸·본문·코드 블록 등 **UI 전역**을 밝은/어두운 모드로 전환할 때는, 유틸 클래스 나열 대신 **토큰(변수) 한 벌을 테마별로 덮어쓰는 방식**을 권장합니다. Tailwind만 쓰는 경우에도 `darkMode: 'class'`로 `html`에 클래스를 붙이고, 커스텀 속성은 `@layer base { :root { … } html.dark { … } }`처럼 정리하면 동일한 패턴입니다.
+
+### 13.1 루트 표기
+
+| 방식 | 예시 | 비고 |
+|------|------|------|
+| `data-theme` | `<html lang="ko" data-theme="light">` | 본 저장소 **Markdown Viewer** 뷰어에서 사용 |
+| 클래스 | `<html class="dark">` | Tailwind `darkMode: 'class'` 관례 |
+
+`color-scheme: light | dark`를 `html`에 맞춰 두면 스크롤바·폼 등 **네이티브 UI**가 테마에 가깝게 동기화됩니다.
+
+### 13.2 토큰 예시 (CSS 변수)
+
+- **공통**: `--shell-bg`, `--text-strong`, `--panel-bg`, `--topbar-bg`, `--control-border` 등 레이아웃·컨트롤용.
+- **본문(마크다운)**: `--content-prose`, `--content-link`, `--theme-pre-bg`, `--theme-td-border` 등 프리셋이 비어 있을 때 쓰는 **읽기 영역 기본값**.
+
+라이트를 `:root`에 두고, 다크는 `html[data-theme="dark"] { … }` 한 블록으로 덮어쓰면 조건 분기가 단순합니다.
+
+### 13.3 사용자 선택 기억
+
+| 저장소 | 이 프로젝트 |
+|--------|-------------|
+| `chrome.storage.local` | 키 `viewer_theme_v1`, 값 `light` \| `dark` (기본값 `light`) |
+
+웹만 지원하는 앱이라면 `localStorage` 또는 서버 프로필에 동일한 키·값 규칙을 두면 됩니다.
+
+### 13.4 Tailwind 대응 맵 (참고)
+
+| 이 문서(변수) | Tailwind 느낌(라이트) |
+|----------------|----------------------|
+| 페이지 배경 | `bg-gray-50` |
+| 카드·본문 패널 | `bg-white border-gray-200` |
+| 다크 시 배경 | `bg-slate-900`, 패널 `bg-slate-800` |
+| 링크(본문) | `text-blue-600` / 다크에서 `text-blue-300` |
+
+---
+
+## 14. 이식 체크리스트
 
 1. **Tailwind** 설치 및 `content`에 소스 경로 포함.
 2. **전역**: `body`에 `bg-gray-50 text-gray-900 antialiased`, 폰트는 `system-ui` 계열.
@@ -550,17 +589,19 @@ div.grid.grid-cols-2.gap-3
 7. **Primary** `bg-blue-600 text-white … rounded`, 비활성 `disabled:opacity-50`.
 8. **모달** `bg-black/40` + 흰 패널 `rounded-lg shadow-lg` + 필요 시 `z-50`~`z-[80]`.
 9. 브랜드 전용 색을 과도하게 넣기보다, 우선 **gray / blue / green / amber / red / purple / slate** 로 톤을 맞춘 뒤 필요 시 점진적으로 확장.
+10. **라이트/다크**가 필요하면 §13처럼 `data-theme` + CSS 변수로 셸·읽기 영역을 묶고, 선호 값은 `chrome.storage.local` 또는 `localStorage`에 저장.
 
 ---
 
-## 14. 프로젝트에 맞게 채울 참조 테이블 (템플릿)
+## 15. 프로젝트에 맞게 채울 참조 테이블 (템플릿)
 
 아래는 **본 저장소에 실제 경로를 적어 두는 용도**의 빈 템플릿입니다. 복사 후 팀 규칙에 맞게 수정하세요.
 
 | 영역 | 이 프로젝트의 경로/컴포넌트명 |
 |------|-----------------------------|
-| 셸·사이드바 | |
-| 전역 CSS | |
+| 셸·사이드바 | `viewer.html` / `styles/viewer.css` (`.sidebar-panel`, `.nav-tree*`) |
+| 테마 | `viewer.js` (`viewer_theme_v1`), `viewer.html` (`data-theme`), `styles/viewer.css` (`:root` / `html[data-theme="dark"]`) |
+| 전역 CSS | `styles/viewer.css` |
 | 루트 레이아웃 | |
 | 로그인 | |
 | 설정 폼 | |
@@ -571,4 +612,4 @@ div.grid.grid-cols-2.gap-3
 
 ---
 
-*문서는 **Tailwind 유틸 조합** 중심의 범용 가이드입니다. 실제 코드베이스의 레이아웃·토큰이 바뀌면 §14에 반영하거나, 팀 위키에 링크해 동기화하는 것을 권장합니다.*
+*문서는 **Tailwind 유틸 조합** 중심의 범용 가이드입니다. 실제 코드베이스의 레이아웃·토큰이 바뀌면 §15 표에 반영하거나, 팀 위키에 링크해 동기화하는 것을 권장합니다.*

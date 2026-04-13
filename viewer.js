@@ -10,11 +10,13 @@ import {
 } from "./storage/presets.js";
 
 const RECENT_DOCS_KEY = "recent_docs_v1";
+const THEME_PREF_KEY = "viewer_theme_v1";
 const MAX_RECENTS = 20;
 const HANDLE_DB_NAME = "md_viewer_handles_v1";
 const HANDLE_STORE = "handles";
 const openFileButton = document.getElementById("open-file-btn");
 const refreshButton = document.getElementById("refresh-btn");
+const themeSelect = document.getElementById("theme-select");
 const presetSelect = document.getElementById("preset-select");
 const statusLine = document.getElementById("status-line");
 const contentRoot = document.getElementById("content-root");
@@ -111,6 +113,27 @@ function storageSet(data) {
   return new Promise((resolve) => {
     chrome.storage.local.set(data, () => resolve());
   });
+}
+
+const VALID_THEMES = new Set(["light", "dark"]);
+
+function applyTheme(theme) {
+  const value = VALID_THEMES.has(theme) ? theme : "light";
+  document.documentElement.dataset.theme = value;
+  document.documentElement.style.colorScheme = value;
+  if (themeSelect && themeSelect.value !== value) {
+    themeSelect.value = value;
+  }
+}
+
+async function loadThemePreference() {
+  const stored = await storageGet(THEME_PREF_KEY);
+  applyTheme(stored || "light");
+}
+
+async function persistTheme(theme) {
+  const value = VALID_THEMES.has(theme) ? theme : "light";
+  await storageSet({ [THEME_PREF_KEY]: value });
 }
 
 async function upsertRecentDoc(entry) {
@@ -830,6 +853,13 @@ async function reopenRecentDoc(doc) {
 }
 
 presetSelect.addEventListener("change", () => void onPresetChange());
+if (themeSelect) {
+  themeSelect.addEventListener("change", () => {
+    const value = themeSelect.value;
+    applyTheme(value);
+    void persistTheme(value);
+  });
+}
 openFileButton.addEventListener("click", () => void openMarkdownFile());
 refreshButton.addEventListener("click", () => {
   if (!currentDocState) {
@@ -880,6 +910,7 @@ window.addEventListener("pagehide", () => {
 });
 
 async function initializeViewer() {
+  await loadThemePreference();
   setupSidebarTabs();
   await ensureDefaultPreset();
   await refreshPresetSelect(null);
