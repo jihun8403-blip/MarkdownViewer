@@ -11,6 +11,7 @@ import {
 } from "./storage/presets.js";
 
 const RECENT_DOCS_KEY = "recent_docs_v1";
+const RECENT_TREE_EXPAND_KEY = "recent_tree_expand_v1";
 const THEME_PREF_KEY = "viewer_theme_v1";
 const MAX_RECENTS = 20;
 const HANDLE_DB_NAME = "md_viewer_handles_v1";
@@ -33,6 +34,8 @@ const markdownRenderer =
       })
     : null;
 const parserWorker = new Worker("worker/markdown_worker.js", { type: "classic" });
+/** @type {Record<string, boolean>} folder path (display segments, "/"-joined) → expanded */
+let recentExpandState = {};
 let currentDocState = null;
 let currentRawText = "";
 let pendingTocSectionId = null;
@@ -202,7 +205,15 @@ function buildRecentDirTree(docs) {
   return root;
 }
 
-function makeFolderBranch(defaultOpen) {
+function isRecentFolderExpanded(folderPath, depth) {
+  if (Object.prototype.hasOwnProperty.call(recentExpandState, folderPath)) {
+    return recentExpandState[folderPath];
+  }
+  return depth < 2;
+}
+
+function makeFolderBranch(folderPath, depth) {
+  const defaultOpen = isRecentFolderExpanded(folderPath, depth);
   const li = document.createElement("li");
   li.className = "nav-tree-branch";
   const folderBtn = document.createElement("button");
@@ -220,27 +231,38 @@ function makeFolderBranch(defaultOpen) {
   const nestedUl = document.createElement("ul");
   nestedUl.className = "nav-tree nav-tree-nested";
   nestedUl.hidden = !defaultOpen;
+  const syncAriaLabel = (label, expanded) => {
+    text.textContent = label;
+    folderBtn.setAttribute("aria-label", expanded ? `폴더 ${label} 접기` : `폴더 ${label} 펼치기`);
+  };
   folderBtn.addEventListener("click", () => {
     const willShow = nestedUl.hidden;
     nestedUl.hidden = !willShow;
     folderBtn.setAttribute("aria-expanded", String(willShow));
     chev.textContent = willShow ? "▼" : "▶";
+    recentExpandState[folderPath] = willShow;
+    syncAriaLabel(text.textContent, willShow);
+    void storageSet({ [RECENT_TREE_EXPAND_KEY]: recentExpandState });
   });
   li.appendChild(folderBtn);
   li.appendChild(nestedUl);
-  return { li, nestedUl, setLabel: (label) => {
-    text.textContent = label;
-    folderBtn.setAttribute("aria-label", `폴더 ${label} 펼치기`);
-  } };
+  return {
+    li,
+    nestedUl,
+    setLabel: (label) => {
+      syncAriaLabel(label, !nestedUl.hidden);
+    }
+  };
 }
 
-function renderRecentDirNode(dir, ul, depth) {
+function renderRecentDirNode(dir, ul, depth, pathPrefix) {
   const subKeys = [...dir.subdirs.keys()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   for (const key of subKeys) {
     const sub = dir.subdirs.get(key);
-    const { li, nestedUl, setLabel } = makeFolderBranch(depth < 2);
+    const folderPath = pathPrefix ? `${pathPrefix}/${key}` : key;
+    const { li, nestedUl, setLabel } = makeFolderBranch(folderPath, depth);
     setLabel(sub.label);
-    renderRecentDirNode(sub, nestedUl, depth + 1);
+    renderRecentDirNode(sub, nestedUl, depth + 1, folderPath);
     ul.appendChild(li);
   }
   for (const doc of dir.files) {
@@ -268,7 +290,7 @@ function renderRecentDocs(docs) {
     return;
   }
   const tree = buildRecentDirTree(docs);
-  renderRecentDirNode(tree, recentList, 0);
+  renderRecentDirNode(tree, recentList, 0, "");
 }
 
 function setupSidebarTabs() {
@@ -291,6 +313,11 @@ function setupSidebarTabs() {
 }
 
 async function loadAndRenderRecents() {
+  const storedExpand = await storageGet(RECENT_TREE_EXPAND_KEY);
+  recentExpandState =
+    storedExpand && typeof storedExpand === "object" && !Array.isArray(storedExpand)
+      ? { ...storedExpand }
+      : {};
   const docs = (await storageGet(RECENT_DOCS_KEY)) || [];
   renderRecentDocs(docs);
 }
